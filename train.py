@@ -87,7 +87,7 @@ def train(model, data_loader, optimizer, epochs=100):
 
 def main():
     non_standard_path = "/path/to/non_standard_stl_files"
-    standard_path = "/path/to/standard_model.stl"
+    standard_path = "/data/xia.stl"
     train_loader = gu.get_generator_set(non_standard_path, standard_path)
 
     model = TeethAlignmentModel()
@@ -97,7 +97,7 @@ def main():
     train(model, train_loader, optimizer, epochs=100)
 
     # 保存模型
-    model_path = '/home/teeth_alignment_model.pth'
+    model_path = '/data/teeth_alignment_model.pth'
     torch.save(model.state_dict(), model_path)
     print(f"Model saved to {model_path}")
 
