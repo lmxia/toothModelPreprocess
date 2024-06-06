@@ -22,7 +22,8 @@ class InferenceHandler(tornado.web.RequestHandler):
             data = tornado.escape.json_decode(self.request.body)
             object_key = data['object_key']
             file_path = f'/tmp/{object_key}'
-            transformed_key = f"{object_key}_transformed.stl"
+            obj_name = object_key.split(".")[0]
+            transformed_key = f"{obj_name}.obj"
             transformed_path = f'/tmp/{transformed_key}'
 
             # Download file from OBS
@@ -79,7 +80,7 @@ if __name__ == "__main__":
     model.eval()
 
     # Load standard model point cloud
-    standard_cloud, _ = gu.load_and_sample_mesh(args.standard_model_path)
+    standard_cloud = gu.load_and_sample_mesh(args.standard_model_path)
     standard_cloud = torch.tensor(standard_cloud, dtype=torch.float32)
 
     # Initialize OBS client
