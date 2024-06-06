@@ -13,7 +13,7 @@ class TeethDataset(Dataset):
         for dir_path in [x[0] for x in os.walk(non_standard_path)][1:]:
             stl_path_ls += glob(os.path.join(dir_path, "*Lower-PreparationScan_transformed.stl"))
 
-        self.mesh_paths = dir_path
+        self.mesh_paths = stl_path_ls
         self.standard_path = standard_path
         self.standard_cloud = self.load_and_sample_mesh(self.standard_path, num_points)
         self.num_points = num_points

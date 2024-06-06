@@ -21,6 +21,8 @@ class InferenceHandler(tornado.web.RequestHandler):
             data = tornado.escape.json_decode(self.request.body)
             object_key = data['object_key']
             file_path = f'/tmp/{object_key}'
+            transformed_key = f"{object_key}_transformed.stl"
+            transformed_path = f'/tmp/{transformed_key}'
 
             # Download file from OBS
             self.obs_client.getObject(self.bucket_name, object_key, file_path)
@@ -46,11 +48,18 @@ class InferenceHandler(tornado.web.RequestHandler):
                 _, transformed_points = self.model(points, self.standard_cloud.unsqueeze(0).permute(0, 2, 1))
                 transformed_points = transformed_points.squeeze().permute(1, 0).numpy()
 
+            # Save transformed points to STL
+            transformed_mesh = trimesh.Trimesh(vertices=transformed_points, faces=mesh.faces)
+            transformed_mesh.export(transformed_path)
+
+            # Upload transformed STL to OBS
+            self.obs_client.putFile(self.bucket_name, transformed_key, transformed_path)
+            os.remove(transformed_path)
+
             response = {
-                "transformed_points": transformed_points.tolist()
+                "transformed_key": transformed_key
             }
             self.write(json.dumps(response))
-
         except Exception as e:
             self.write(json.dumps({"error": str(e)}))
 
@@ -75,10 +84,10 @@ if __name__ == "__main__":
     parser.add_argument('--port', type=int, default=8888, help='Port to listen on')
     parser.add_argument('--obs_access_key', type=str, required=True, help='OBS access key')
     parser.add_argument('--obs_secret_key', type=str, required=True, help='OBS secret key')
-    parser.add_argument('--obs_endpoint', type=str, required=True, help='OBS endpoint')
-    parser.add_argument('--bucket_name', type=str, required=True, help='OBS bucket name')
+    parser.add_argument('--obs_endpoint', type=str, default="obs.cn-east-3.myhuaweicloud.com", help='OBS endpoint')
+    parser.add_argument('--bucket_name', type=str, default="teeth-label-dev", help='OBS bucket name')
     parser.add_argument('--model_path', type=str, default='/home/teeth_alignment_model.pth', help='Path to the trained model')
-    parser.add_argument('--standard_model_path', type=str, required=True, help='Path to the standard model STL file')
+    parser.add_argument('--standard_model_path', type=str, default='/data/xia.stl', help='Path to the standard model STL file')
 
     args = parser.parse_args()
 
