@@ -79,7 +79,7 @@ if __name__ == "__main__":
     model.eval()
 
     # Load standard model point cloud
-    standard_cloud = gu.load_and_sample_mesh(args.standard_model_path)
+    standard_cloud, _ = gu.load_and_sample_mesh(args.standard_model_path)
     standard_cloud = torch.tensor(standard_cloud, dtype=torch.float32)
 
     # Initialize OBS client
