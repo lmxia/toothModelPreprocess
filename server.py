@@ -27,8 +27,7 @@ class InferenceHandler(tornado.web.RequestHandler):
 
             # Download file from OBS
             self.obs_client.getObject(self.bucket_name, object_key, file_path)
-            mesh = trimesh.load(file_path)
-            points = gu.load_and_sample_mesh(file_path)
+            points, faces = gu.load_and_sample_mesh(file_path)
             os.remove(file_path)
 
             points = torch.tensor(points, dtype=torch.float32).unsqueeze(0).permute(0, 2, 1)  # Reshape to match model input
@@ -40,7 +39,7 @@ class InferenceHandler(tornado.web.RequestHandler):
                 transformed_points = transformed_points.squeeze().permute(1, 0).numpy()
 
             # Save transformed points to STL
-            transformed_mesh = trimesh.Trimesh(vertices=transformed_points, faces=mesh.faces)
+            transformed_mesh = trimesh.Trimesh(vertices=transformed_points, faces=faces)
             transformed_mesh.export(transformed_path)
 
             # Upload transformed STL to OBS

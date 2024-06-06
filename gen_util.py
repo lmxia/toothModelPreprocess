@@ -15,20 +15,22 @@ class TeethDataset(Dataset):
 
         self.mesh_paths = stl_path_ls
         self.standard_path = standard_path
-        self.standard_cloud = load_and_sample_mesh(self.standard_path, num_points)
+        self.standard_cloud, _ = load_and_sample_mesh(self.standard_path, num_points)
         self.num_points = num_points
 
     def __len__(self):
         return len(self.mesh_paths)
 
     def __getitem__(self, idx):
-        source = load_and_sample_mesh(self.mesh_paths[idx], self.num_points)
+        source, _ = load_and_sample_mesh(self.mesh_paths[idx], self.num_points)
         target = self.standard_cloud
         return torch.tensor(source, dtype=torch.float32), torch.tensor(target, dtype=torch.float32)
 
 
 def load_and_sample_mesh(path, num_points=24000):
     mesh = trimesh.load(path)
+    faces = mesh.faces
+
     points = mesh.vertices
 
     # Normalize the point cloud (optional, but often beneficial)
@@ -37,16 +39,22 @@ def load_and_sample_mesh(path, num_points=24000):
 
     # Sample points
     if len(points) > num_points:
-        points = downsample(points, num_points)
+        points, faces = downsample(points, faces, num_points)
     elif len(points) < num_points:
         points = upsample(points, num_points)
 
-    return points
+    return points, faces
 
 
-def downsample(points, num_points):
+# 特殊处理，face会欠缺。
+def downsample(points, faces, num_points):
     indices = np.random.choice(points.shape[0], num_points, replace=False)
-    return points[indices]
+
+    faces = faces[np.all(np.isin(faces, indices), axis=1)]
+    new_indices = {old_idx: new_idx for new_idx, old_idx in enumerate(indices)}
+    faces = np.vectorize(new_indices.get)(faces)
+
+    return points[indices], faces
 
 
 def upsample(points, num_points):
