@@ -35,8 +35,10 @@ class InferenceHandler(tornado.web.RequestHandler):
             # Model inference
             self.model.eval()
             with torch.no_grad():
-                _, transformed_points = self.model(points, self.standard_cloud.unsqueeze(0).permute(0, 2, 1))
-                transformed_points = transformed_points.squeeze().permute(1, 0).numpy()
+                rotation_matrix, translation_vector = self.model(points, self.standard_cloud.unsqueeze(0).permute(0, 2, 1))
+
+            transformed_points = np.dot(points.squeeze().permute(1, 0).numpy(), rotation_matrix.squeeze().numpy().T) +\
+                                 translation_vector.squeeze().numpy()
 
             # Save transformed points to STL
             transformed_mesh = trimesh.Trimesh(vertices=transformed_points, faces=faces)
