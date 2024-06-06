@@ -86,7 +86,7 @@ def train(model, data_loader, optimizer, epochs=100):
 
 
 def main():
-    non_standard_path = "/path/to/non_standard_stl_files"
+    non_standard_path = "/data/non_standard"
     standard_path = "/data/xia.stl"
     train_loader = gu.get_generator_set(non_standard_path, standard_path)
 

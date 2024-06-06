@@ -9,7 +9,11 @@ import random
 
 class TeethDataset(Dataset):
     def __init__(self, non_standard_path, standard_path, num_points=24000):
-        self.mesh_paths = glob(os.path.join(non_standard_path, "*.stl"))
+        stl_path_ls = []
+        for dir_path in [x[0] for x in os.walk(non_standard_path)][1:]:
+            stl_path_ls += glob(os.path.join(dir_path, "*Lower-PreparationScan_transformed.stl"))
+
+        self.mesh_paths = dir_path
         self.standard_path = standard_path
         self.standard_cloud = self.load_and_sample_mesh(self.standard_path, num_points)
         self.num_points = num_points
