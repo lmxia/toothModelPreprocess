@@ -32,8 +32,8 @@ class TeethAlignmentModel(nn.Module):
         self.bn5 = nn.BatchNorm1d(256)
 
     def forward(self, source, template):
-        source_features = self.feature_extractor(source.transpose(2, 1)).max(dim=2)[0]
-        target_features = self.feature_extractor(template.transpose(2, 1)).max(dim=2)[0]
+        source_features = self.feature_extractor(source.transpose(2, 1).float()).max(dim=2)[0]
+        target_features = self.feature_extractor(template.transpose(2, 1).float()).max(dim=2)[0]
 
         # Concatenate features from both point clouds
         combined_features = torch.cat((source_features, target_features), 1)
@@ -65,8 +65,6 @@ def train(model, data_loader, optimizer, epochs=100):
     for epoch in range(epochs):
         epoch_loss = 0
         for source, target in data_loader:
-            source = source.permute(0, 2, 1).float()
-            target = target.permute(0, 2, 1).float()
             optimizer.zero_grad()
             rot, trans = model(source, target)
             source_transformed = gu.apply_transform(source, rot, trans)
