@@ -68,3 +68,32 @@ def get_generator_set(non_standard_path, standard_path, batch_size=32, num_point
     )
 
     return point_loader
+
+
+def apply_transform(points, rotation, translation):
+    batch_size = points.size(0)
+    rotation_matrix = quat_to_rotmat(rotation)
+    points_rotated = torch.bmm(points.transpose(2, 1), rotation_matrix).transpose(2, 1)
+    points_transformed = points_rotated + translation.unsqueeze(2)
+    return points_transformed
+
+
+def quat_to_rotmat(quat):
+    # Convert quaternion to rotation matrix
+    batch_size = quat.size(0)
+    norm_quat = quat / quat.norm(p=2, dim=1, keepdim=True)
+    w, x, y, z = norm_quat[:, 0], norm_quat[:, 1], norm_quat[:, 2], norm_quat[:, 3]
+    B = batch_size
+
+    rotmat = torch.zeros((B, 3, 3)).to(quat.device)
+    rotmat[:, 0, 0] = 1 - 2 * (y ** 2 + z ** 2)
+    rotmat[:, 0, 1] = 2 * (x * y - z * w)
+    rotmat[:, 0, 2] = 2 * (x * z + y * w)
+    rotmat[:, 1, 0] = 2 * (x * y + z * w)
+    rotmat[:, 1, 1] = 1 - 2 * (x ** 2 + z ** 2)
+    rotmat[:, 1, 2] = 2 * (y * z - x * w)
+    rotmat[:, 2, 0] = 2 * (x * z - y * w)
+    rotmat[:, 2, 1] = 2 * (y * z + x * w)
+    rotmat[:, 2, 2] = 1 - 2 * (x ** 2 + y ** 2)
+
+    return rotmat

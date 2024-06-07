@@ -36,8 +36,9 @@ class InferenceHandler(tornado.web.RequestHandler):
             # Model inference
             self.model.eval()
             with torch.no_grad():
-                _, transformed_points = self.model(points, self.standard_cloud.unsqueeze(0).permute(0, 2, 1))
-                transformed_points = transformed_points.squeeze().permute(1, 0).numpy()
+                rot, trans = self.model(points, self.standard_cloud.unsqueeze(0).permute(0, 2, 1))
+                source_transformed = gu.apply_transform(points, rot, trans)
+                transformed_points = source_transformed.squeeze().permute(1, 0).numpy()
 
             with open(transformed_path, 'w') as file:
                 for point in transformed_points:
