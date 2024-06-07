@@ -8,19 +8,17 @@ class TeethAlignmentModel(nn.Module):
     def __init__(self):
         super(TeethAlignmentModel, self).__init__()
 
-        # MLPs for source point cloud
-        self.source_conv1 = nn.Conv1d(3, 64, 1)
-        self.source_conv2 = nn.Conv1d(64, 64, 1)
-        self.source_conv3 = nn.Conv1d(64, 64, 1)
-        self.source_conv4 = nn.Conv1d(64, 128, 1)
-        self.source_conv5 = nn.Conv1d(128, 1024, 1)
-
-        # MLPs for template point cloud
-        self.template_conv1 = nn.Conv1d(3, 64, 1)
-        self.template_conv2 = nn.Conv1d(64, 64, 1)
-        self.template_conv3 = nn.Conv1d(64, 64, 1)
-        self.template_conv4 = nn.Conv1d(64, 128, 1)
-        self.template_conv5 = nn.Conv1d(128, 1024, 1)
+        self.feature_extractor = nn.Sequential(
+            nn.Conv1d(3, 64, 1),
+            nn.BatchNorm1d(64),
+            nn.ReLU(),
+            nn.Conv1d(64, 128, 1),
+            nn.BatchNorm1d(128),
+            nn.ReLU(),
+            nn.Conv1d(128, 1024, 1),
+            nn.BatchNorm1d(1024),
+            nn.ReLU()
+        )
 
         # Fully connected layers for pose estimation
         self.fc1 = nn.Linear(2048, 1024)
@@ -29,36 +27,19 @@ class TeethAlignmentModel(nn.Module):
         self.fc_rot = nn.Linear(256, 4)  # Quaternion for rotation
         self.fc_trans = nn.Linear(256, 3)  # Translation vector
 
-        self.bn1 = nn.BatchNorm1d(64)
-        self.bn2 = nn.BatchNorm1d(128)
         self.bn3 = nn.BatchNorm1d(1024)
         self.bn4 = nn.BatchNorm1d(512)
         self.bn5 = nn.BatchNorm1d(256)
 
     def forward(self, source, template):
-        # Source point cloud through MLPs
-        src = F.relu(self.bn1(self.source_conv1(source)))
-        src = F.relu(self.bn1(self.source_conv2(src)))
-        src = F.relu(self.bn1(self.source_conv3(src)))
-        src = F.relu(self.bn2(self.source_conv4(src)))
-        src = F.relu(self.bn3(self.source_conv5(src)))
-        src = torch.max(src, 2, keepdim=True)[0]
-        src = src.view(-1, 1024)
-
-        # Template point cloud through MLPs
-        tmpl = F.relu(self.bn1(self.template_conv1(template)))
-        tmpl = F.relu(self.bn1(self.template_conv2(tmpl)))
-        tmpl = F.relu(self.bn1(self.template_conv3(tmpl)))
-        tmpl = F.relu(self.bn2(self.template_conv4(tmpl)))
-        tmpl = F.relu(self.bn3(self.template_conv5(tmpl)))
-        tmpl = torch.max(tmpl, 2, keepdim=True)[0]
-        tmpl = tmpl.view(-1, 1024)
+        source_features = self.feature_extractor(source.transpose(2, 1)).max(dim=2)[0]
+        target_features = self.feature_extractor(template.transpose(2, 1)).max(dim=2)[0]
 
         # Concatenate features from both point clouds
-        combined_features = torch.cat((src, tmpl), 1)
+        combined_features = torch.cat((source_features, target_features), 1)
 
         # Fully connected layers
-        x = F.relu(self.bn4(self.fc1(combined_features)))
+        x = F.relu(self.bn3(self.fc1(combined_features)))
         x = F.relu(self.bn4(self.fc2(x)))
         x = F.relu(self.bn5(self.fc3(x)))
 
