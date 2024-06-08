@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import gen_util as gu
+from pytorch3d.loss import chamfer_distance
 
 
 class TeethAlignmentModel(nn.Module):
@@ -48,17 +49,6 @@ class TeethAlignmentModel(nn.Module):
         trans = self.fc_trans(x)
 
         return rot, trans
-
-
-def chamfer_distance(pc1, pc2):
-    batch_size, num_points, _ = pc1.size()
-    pc1 = pc1.unsqueeze(1).repeat(1, num_points, 1, 1)
-    pc2 = pc2.unsqueeze(2).repeat(1, 1, num_points, 1)
-    dist = torch.sum((pc1 - pc2) ** 2, dim=-1)
-    min_dist1, _ = torch.min(dist, dim=1)
-    min_dist2, _ = torch.min(dist, dim=2)
-    return torch.mean(min_dist1) + torch.mean(min_dist2)
-
 
 def train(model, data_loader, optimizer, epochs=100):
     model.train()

@@ -1,0 +1,3 @@
+trimesh
+pytorch3d
+numpy==1.23.0
