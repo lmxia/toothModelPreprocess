@@ -50,6 +50,7 @@ class TeethAlignmentModel(nn.Module):
 
         return rot, trans
 
+
 def train(model, data_loader, optimizer, epochs=100):
     model.train()
     for epoch in range(epochs):
