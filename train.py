@@ -2,8 +2,12 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import gen_util as gu
-import kaolin.metrics.pointcloud as metrics
+from chamferdist import ChamferDistance
+import logging
 
+# 配置日志记录
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 class TeethAlignmentModel(nn.Module):
     def __init__(self):
@@ -53,17 +57,20 @@ class TeethAlignmentModel(nn.Module):
 
 def train(model, data_loader, optimizer, epochs=100):
     model.train()
+    chamfer_dist = ChamferDistance()
     for epoch in range(epochs):
         epoch_loss = 0
         for source, target in data_loader:
             optimizer.zero_grad()
             rot, trans = model(source, target)
             source_transformed = gu.apply_transform(source, rot, trans)
-            loss = metrics.chamfer_distance(source_transformed, target)
+            loss = chamfer_dist(source_transformed, target)
             loss.backward()
             optimizer.step()
             epoch_loss += loss.item()
-        print(f"Epoch {epoch + 1}, Loss: {epoch_loss / len(data_loader)}")
+            logger.info(f"handle a batch with loss {epoch_loss}")
+
+        logger.info(f"Epoch {epoch + 1}, Loss: {epoch_loss / len(data_loader)}")
 
 
 def main():
@@ -80,7 +87,7 @@ def main():
     # 保存模型
     model_path = '/data/teeth_alignment_model.pth'
     torch.save(model.state_dict(), model_path)
-    print(f"Model saved to {model_path}")
+    logger.info(f"Model saved to {model_path}")
 
 
 if __name__ == '__main__':
