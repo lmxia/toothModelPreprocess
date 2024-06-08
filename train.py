@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import gen_util as gu
-from pytorch3d.loss import chamfer_distance
+import kaolin.metrics.pointcloud as metrics
 
 
 class TeethAlignmentModel(nn.Module):
@@ -59,7 +59,7 @@ def train(model, data_loader, optimizer, epochs=100):
             optimizer.zero_grad()
             rot, trans = model(source, target)
             source_transformed = gu.apply_transform(source, rot, trans)
-            loss = chamfer_distance(source_transformed, target)
+            loss = metrics.chamfer_distance(source_transformed, target)
             loss.backward()
             optimizer.step()
             epoch_loss += loss.item()
