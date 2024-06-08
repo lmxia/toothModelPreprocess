@@ -73,8 +73,12 @@ def get_generator_set(non_standard_path, standard_path, batch_size=32, num_point
 def apply_transform(points, rotation, translation):
     batch_size = points.size(0)
     rotation_matrix = quat_to_rotmat(rotation)
-    points_rotated = torch.bmm(points.transpose(2, 1), rotation_matrix).transpose(2, 1)
-    points_transformed = points_rotated + translation.unsqueeze(2)
+    points_transposed = points.transpose(2, 1)  # (B, 3, 48000)
+    # Perform batch matrix multiplication
+    points_rotated = torch.bmm(rotation_matrix, points_transposed)  # (B, 3, 48000)
+    points_rotated = points_rotated.transpose(2, 1)  # (B, 48000, 3)
+
+    points_transformed = points_rotated + translation.unsqueeze(1)  # (B, 48000, 3)
     return points_transformed
 
 
