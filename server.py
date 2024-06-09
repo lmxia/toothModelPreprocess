@@ -40,8 +40,9 @@ class InferenceHandler(tornado.web.RequestHandler):
             with torch.no_grad():
                 rot, trans = self.model(points, self.standard_cloud.unsqueeze(0))
                 source_transformed = gu.apply_transform(points, rot, trans)
+                loss = chamfer_dist(source_transformed, self.standard_cloud.unsqueeze(0))
                 transformed_points = source_transformed.squeeze().numpy()
-                loss = chamfer_dist(transformed_points, self.standard_cloud)
+                print("loss is ", loss)
 
             with open(transformed_path, 'w') as file:
                 for point in transformed_points:
