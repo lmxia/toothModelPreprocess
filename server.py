@@ -8,6 +8,7 @@ import json
 import numpy as np
 from train import TeethAlignmentModel
 import gen_util as gu
+from chamferdist import ChamferDistance
 
 
 class InferenceHandler(tornado.web.RequestHandler):
@@ -25,20 +26,22 @@ class InferenceHandler(tornado.web.RequestHandler):
             obj_name = object_key.split(".")[0]
             transformed_key = f"{obj_name}.obj"
             transformed_path = f'/tmp/{transformed_key}'
+            chamfer_dist = ChamferDistance()
 
             # Download file from OBS
             self.obs_client.getObject(self.bucket_name, object_key, file_path)
             points = gu.load_and_sample_mesh(file_path)
             os.remove(file_path)
 
-            points = torch.tensor(points, dtype=torch.float32).unsqueeze(0).permute(0, 2, 1)  # Reshape to match model input
+            points = torch.tensor(points, dtype=torch.float32).unsqueeze(0)  # Reshape to match model input
 
             # Model inference
             self.model.eval()
             with torch.no_grad():
-                rot, trans = self.model(points, self.standard_cloud.unsqueeze(0).permute(0, 2, 1))
+                rot, trans = self.model(points, self.standard_cloud.unsqueeze(0))
                 source_transformed = gu.apply_transform(points, rot, trans)
-                transformed_points = source_transformed.squeeze().permute(1, 0).numpy()
+                transformed_points = source_transformed.squeeze().numpy()
+                loss = chamfer_dist(transformed_points, self.standard_cloud)
 
             with open(transformed_path, 'w') as file:
                 for point in transformed_points:
