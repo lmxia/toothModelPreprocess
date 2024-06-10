@@ -15,34 +15,31 @@ class TeethDataset(Dataset):
 
         self.mesh_paths = stl_path_ls
         self.standard_path = standard_path
-        self.standard_cloud = load_and_sample_mesh(self.standard_path, num_points)
+        mesh = load_and_sample_mesh(self.standard_path, num_points)
+        self.standard_cloud = mesh.vertices
         self.num_points = num_points
 
     def __len__(self):
         return len(self.mesh_paths)
 
     def __getitem__(self, idx):
-        source = load_and_sample_mesh(self.mesh_paths[idx], self.num_points)
+        mesh = load_and_sample_mesh(self.mesh_paths[idx], self.num_points)
         target = self.standard_cloud
-        return torch.tensor(source, dtype=torch.float32), torch.tensor(target, dtype=torch.float32)
+        return torch.tensor(mesh.vertices, dtype=torch.float32), torch.tensor(target, dtype=torch.float32)
 
 
 def load_and_sample_mesh(path, num_points=48000):
     mesh = trimesh.load(path)
-
-    points = mesh.vertices
+    simplified_mesh = mesh.simplify_quadratic_decimation(num_points)
+    points = simplified_mesh.vertices
 
     # Normalize the point cloud (optional, but often beneficial)
     points = points - np.mean(points, axis=0)
     points = points / np.max(np.linalg.norm(points, axis=1))
 
-    # Sample points
-    if len(points) > num_points:
-        points = downsample(points, num_points)
-    elif len(points) < num_points:
-        points = upsample(points, num_points)
+    simplified_mesh.vertices = points
 
-    return points
+    return simplified_mesh
 
 
 # 特殊处理，face会欠缺。

@@ -30,10 +30,10 @@ class InferenceHandler(tornado.web.RequestHandler):
 
             # Download file from OBS
             self.obs_client.getObject(self.bucket_name, object_key, file_path)
-            points = gu.load_and_sample_mesh(file_path)
+            mesh = gu.load_and_sample_mesh(file_path)
             os.remove(file_path)
 
-            points = torch.tensor(points, dtype=torch.float32).unsqueeze(0)  # Reshape to match model input
+            points = torch.tensor(mesh.vertices, dtype=torch.float32).unsqueeze(0)  # Reshape to match model input
 
             # Model inference
             self.model.eval()
@@ -44,9 +44,12 @@ class InferenceHandler(tornado.web.RequestHandler):
                 transformed_points = source_transformed.squeeze().numpy()
                 print("loss is ", loss)
 
-            with open(transformed_path, 'w') as file:
-                for point in transformed_points:
-                    file.write(f"v {point[0]} {point[1]} {point[2]}\n")
+            mesh.vertices = transformed_points
+            mesh.export(transformed_path)
+
+            # with open(transformed_path, 'w') as file:
+            #     for point in transformed_points:
+            #         file.write(f"v {point[0]} {point[1]} {point[2]}\n")
 
             # Upload transformed OBJ to OBS
             self.obs_client.putFile(self.bucket_name, transformed_key, transformed_path)
@@ -85,8 +88,8 @@ if __name__ == "__main__":
     model.eval()
 
     # Load standard model point cloud
-    standard_cloud = gu.load_and_sample_mesh(args.standard_model_path)
-    standard_cloud = torch.tensor(standard_cloud, dtype=torch.float32)
+    standard_mesh = gu.load_and_sample_mesh(args.standard_model_path)
+    standard_cloud = torch.tensor(standard_mesh.vertices, dtype=torch.float32)
 
     # Initialize OBS client
     obs_client = ObsClient(
