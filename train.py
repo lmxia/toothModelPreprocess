@@ -1,9 +1,11 @@
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import gen_util as gu
 from chamferdist import ChamferDistance
 import logging
+import open3d as o3d
 
 # 配置日志记录
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -14,7 +16,7 @@ class TeethAlignmentModel(nn.Module):
         super(TeethAlignmentModel, self).__init__()
 
         self.feature_extractor = nn.Sequential(
-            nn.Conv1d(3, 64, 1),
+            nn.Conv1d(6, 64, 1),
             nn.BatchNorm1d(64),
             nn.ReLU(),
             nn.Conv1d(64, 128, 1),
@@ -64,7 +66,7 @@ def train(model, data_loader, optimizer, epochs=100):
             optimizer.zero_grad()
             rot, trans = model(source, target)
             source_transformed = gu.apply_transform(source, rot, trans)
-            loss = compute_loss(chamfer_dist, source_transformed, rot, trans)
+            loss = compute_loss(chamfer_dist, source_transformed, rot, target)
             loss.backward()
             optimizer.step()
             epoch_loss += loss.item()
@@ -73,18 +75,55 @@ def train(model, data_loader, optimizer, epochs=100):
         logger.info(f"Epoch {epoch + 1}, Loss: {epoch_loss / len(data_loader)}")
 
 
-def compute_loss(chamfer_dist, source_transformed, pred_rot, target):
-    loss_chamfer = chamfer_dist(source_transformed, target)
-    # Regularize quaternion
-    quat_norm = torch.norm(pred_rot, p=2, dim=1)
-    loss_reg = torch.mean((quat_norm - 1) ** 2)
+def normal_consistency_o3d(normals1, normals2, pc1, pc2, k=1):
+    def compute_normal_consistency(pcd_tree, pcd_source, pcd_target):
+        normal_consistency = []
+        for i in range(len(pcd_source.points)):
+            [_, idx, _] = pcd_tree.search_knn_vector_3d(pcd_source.points[i], k)
+            max_dot = max(np.dot(pcd_target.normals[j], pcd_source.normals[i]) for j in idx)
+            normal_consistency.append(max_dot)
+        return normal_consistency
 
-    # Symmetry penalty
-    rot_matrix = gu.quat_to_rotmat(pred_rot)
-    symmetry_loss = torch.mean((rot_matrix + rot_matrix.transpose(2, 1)) ** 2)
+    batch_size = pc1.shape[0]
+    total_consistency = 0
 
-    loss = loss_chamfer + 0.1 * loss_reg + 0.01 * symmetry_loss
-    return loss
+    for b in range(batch_size):
+        pcd1 = o3d.geometry.PointCloud()
+        pcd1.points = o3d.utility.Vector3dVector(pc1[b])
+        pcd1.normals = o3d.utility.Vector3dVector(normals1[b])
+
+        pcd2 = o3d.geometry.PointCloud()
+        pcd2.points = o3d.utility.Vector3dVector(pc2[b])
+        pcd2.normals = o3d.utility.Vector3dVector(normals2[b])
+
+        pcd_tree1 = o3d.geometry.KDTreeFlann(pcd1)
+        pcd_tree2 = o3d.geometry.KDTreeFlann(pcd2)
+
+        normal_consistency1 = compute_normal_consistency(pcd_tree2, pcd1, pcd2)
+        normal_consistency2 = compute_normal_consistency(pcd_tree1, pcd2, pcd1)
+
+        consistency = 1 - (np.mean(normal_consistency1) + np.mean(normal_consistency2)) / 2
+        total_consistency += consistency
+
+    return total_consistency / batch_size
+
+
+def compute_loss(chamfer_dist, source_transformed, target):
+    # Chamfer distance loss
+    loss_chamfer = chamfer_dist(source_transformed[:, :, :3], target[:, :, :3])
+
+    # Normal consistency loss
+    normal_loss = normal_consistency_o3d(
+        source_transformed[:, :, 3:].cpu().numpy(),
+        target[:, :, 3:].cpu().numpy(),
+        source_transformed[:, :, :3].cpu().numpy(),
+        target[:, :, :3].cpu().numpy()
+    )
+
+    # Combine losses
+    total_loss = loss_chamfer + normal_loss * source_transformed.size(1)
+
+    return total_loss
 
 
 def main():

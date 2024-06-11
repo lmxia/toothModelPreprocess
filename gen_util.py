@@ -29,20 +29,31 @@ class TeethDataset(Dataset):
 
 
 def load_and_sample_mesh(path, num_points=24000):
+    # 加载网格
     mesh = trimesh.load(path)
     points = mesh.vertices
 
-    # Normalize the point cloud (optional, but often beneficial)
+    # 检查法向量是否存在，如果不存在则计算法向量
+    if not hasattr(mesh, 'vertex_normals') or mesh.vertex_normals is None or len(mesh.vertex_normals) == 0:
+        mesh.compute_vertex_normals()
+
+    normals = mesh.vertex_normals
+
+    # 归一化点云
     points = points - np.mean(points, axis=0)
     points = points / np.max(np.linalg.norm(points, axis=1))
 
-    # Sample points
+    # 下采样或上采样点云
     if len(points) > num_points:
-        points = downsample(points, num_points)
+        sampled_indices = np.random.choice(len(points), num_points, replace=False)
+        points = points[sampled_indices]
+        normals = normals[sampled_indices]
     elif len(points) < num_points:
-        points = upsample(points, num_points)
+        sampled_indices = np.random.choice(len(points), num_points, replace=True)
+        points = points[sampled_indices]
+        normals = normals[sampled_indices]
 
-    return points
+    return np.hstack((points, normals))
 
 
 # 特殊处理，face会欠缺。
@@ -71,14 +82,36 @@ def get_generator_set(non_standard_path, standard_path, batch_size=2, num_points
 
 
 def apply_transform(points, rotation, translation):
-    batch_size = points.size(0)
+    """
+    Apply rotation and translation to a batch of point clouds.
+    Args:
+        points (Tensor): Point cloud, shape (B, num_points, 6) (coordinates and normals)
+        rotation (Tensor): Quaternion, shape (B, 4)
+        translation (Tensor): Translation vector, shape (B, 3)
+    Returns:
+        Tensor: Transformed point cloud, shape (B, num_points, 6)
+    """
     rotation_matrix = quat_to_rotmat(rotation)
-    points_transposed = points.transpose(2, 1)  # (B, 3, 48000)
-    # Perform batch matrix multiplication
-    points_rotated = torch.bmm(rotation_matrix, points_transposed)  # (B, 3, 48000)
-    points_rotated = points_rotated.transpose(2, 1)  # (B, 48000, 3)
 
-    points_transformed = points_rotated + translation.unsqueeze(1)  # (B, 48000, 3)
+    # Separate coordinates and normals
+    coords = points[:, :, :3]  # (B, num_points, 3)
+    normals = points[:, :, 3:]  # (B, num_points, 3)
+
+    coords_transposed = coords.transpose(2, 1)  # (B, 3, num_points)
+    normals_transposed = normals.transpose(2, 1)  # (B, 3, num_points)
+
+    # Perform batch matrix multiplication
+    coords_rotated = torch.bmm(rotation_matrix, coords_transposed)  # (B, 3, num_points)
+    normals_rotated = torch.bmm(rotation_matrix, normals_transposed)  # (B, 3, num_points)
+
+    coords_rotated = coords_rotated.transpose(2, 1)  # (B, num_points, 3)
+    normals_rotated = normals_rotated.transpose(2, 1)  # (B, num_points, 3)
+
+    coords_transformed = coords_rotated + translation.unsqueeze(1)  # (B, num_points, 3)
+
+    # Concatenate transformed coordinates and rotated normals
+    points_transformed = torch.cat((coords_transformed, normals_rotated), dim=2)  # (B, num_points, 6)
+
     return points_transformed
 
 
