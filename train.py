@@ -64,13 +64,27 @@ def train(model, data_loader, optimizer, epochs=100):
             optimizer.zero_grad()
             rot, trans = model(source, target)
             source_transformed = gu.apply_transform(source, rot, trans)
-            loss = chamfer_dist(source_transformed, target)
+            loss = compute_loss(chamfer_dist, source_transformed, rot, trans, source, target)
             loss.backward()
             optimizer.step()
             epoch_loss += loss.item()
             logger.info(f"handle a batch with loss {epoch_loss}")
 
         logger.info(f"Epoch {epoch + 1}, Loss: {epoch_loss / len(data_loader)}")
+
+
+def compute_loss(chamfer_dist, source_transformed, pred_rot, target):
+    loss_chamfer = chamfer_dist(source_transformed, target)
+    # Regularize quaternion
+    quat_norm = torch.norm(pred_rot, p=2, dim=1)
+    loss_reg = torch.mean((quat_norm - 1) ** 2)
+
+    # Symmetry penalty
+    rot_matrix = gu.quat_to_rotmat(pred_rot)
+    symmetry_loss = torch.mean((rot_matrix + rot_matrix.transpose(2, 1)) ** 2)
+
+    loss = loss_chamfer + 0.1 * loss_reg + 0.01 * symmetry_loss
+    return loss
 
 
 def main():
