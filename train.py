@@ -64,7 +64,7 @@ def train(model, data_loader, optimizer, epochs=100):
             optimizer.zero_grad()
             rot, trans = model(source, target)
             source_transformed = gu.apply_transform(source, rot, trans)
-            loss = compute_loss(chamfer_dist, source_transformed, rot, trans, source, target)
+            loss = compute_loss(chamfer_dist, source_transformed, rot, trans)
             loss.backward()
             optimizer.step()
             epoch_loss += loss.item()
