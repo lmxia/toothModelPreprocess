@@ -66,7 +66,7 @@ def train(model, data_loader, optimizer, epochs=100):
             optimizer.zero_grad()
             rot, trans = model(source, target)
             source_transformed = gu.apply_transform(source, rot, trans)
-            loss = compute_loss(chamfer_dist, source_transformed, rot, target)
+            loss = compute_loss(chamfer_dist, source_transformed, target)
             loss.backward()
             optimizer.step()
             epoch_loss += loss.item()
@@ -114,10 +114,10 @@ def compute_loss(chamfer_dist, source_transformed, target):
 
     # Normal consistency loss
     normal_loss = normal_consistency_o3d(
-        source_transformed[:, :, 3:].cpu().numpy(),
-        target[:, :, 3:].cpu().numpy(),
-        source_transformed[:, :, :3].cpu().numpy(),
-        target[:, :, :3].cpu().numpy()
+        source_transformed[:, :, 3:].detach().cpu().numpy(),
+        target[:, :, 3:].detach().cpu().numpy(),
+        source_transformed[:, :, :3].detach().cpu().numpy(),
+        target[:, :, :3].detach().cpu().numpy()
     )
 
     # Combine losses
