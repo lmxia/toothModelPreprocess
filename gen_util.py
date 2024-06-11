@@ -53,7 +53,7 @@ def upsample(points, num_points):
     return points[indices]
 
 
-def get_generator_set(non_standard_path, standard_path, batch_size=8, num_points=48000):
+def get_generator_set(non_standard_path, standard_path, batch_size=2, num_points=24000):
     point_loader = DataLoader(
         TeethDataset(
             non_standard_path,
