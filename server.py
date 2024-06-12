@@ -9,7 +9,10 @@ import numpy as np
 from train import TeethAlignmentModel
 import gen_util as gu
 from chamferdist import ChamferDistance
+import logging
 
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 class InferenceHandler(tornado.web.RequestHandler):
     def initialize(self, model, obs_client, bucket_name, standard_cloud):
@@ -40,9 +43,9 @@ class InferenceHandler(tornado.web.RequestHandler):
             with torch.no_grad():
                 rot, trans = self.model(points, self.standard_cloud.unsqueeze(0))
                 source_transformed = gu.apply_transform(points, rot, trans)
-                loss = chamfer_dist(source_transformed, self.standard_cloud.unsqueeze(0))
+                loss = chamfer_dist(source_transformed[:, :, :3], self.standard_cloud.unsqueeze(0)[:, :, :3])
                 transformed_points = source_transformed.squeeze().numpy()
-                print("loss is ", loss)
+                logger.info(f"chamfer loss is {loss}")
             #
             # mesh.vertices = transformed_points
             # mesh.export(transformed_path)

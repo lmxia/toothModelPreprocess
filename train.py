@@ -70,7 +70,6 @@ def train(model, data_loader, optimizer, epochs=100):
             loss.backward()
             optimizer.step()
             epoch_loss += loss.item()
-            logger.info(f"handle a batch with loss {epoch_loss}")
 
         logger.info(f"Epoch {epoch + 1}, Loss: {epoch_loss / len(data_loader)}")
 
@@ -120,6 +119,7 @@ def compute_loss(chamfer_dist, source_transformed, target):
         target[:, :, :3].detach().cpu().numpy()
     )
 
+    logger.info(f'chamfer loss is {loss_chamfer} and normal loss is {normal_loss}')
     # Combine losses
     total_loss = loss_chamfer + normal_loss * source_transformed.size(1)
 
