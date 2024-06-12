@@ -1,18 +1,12 @@
 import tornado.ioloop
 import tornado.web
 import torch
-import trimesh
 import os
 from obs import ObsClient
 import json
-import numpy as np
 from train import TeethAlignmentModel
 import gen_util as gu
 from chamferdist import ChamferDistance
-import logging
-
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
 
 class InferenceHandler(tornado.web.RequestHandler):
     def initialize(self, model, obs_client, bucket_name, standard_cloud):
@@ -29,7 +23,6 @@ class InferenceHandler(tornado.web.RequestHandler):
             obj_name = object_key.split(".")[0]
             transformed_key = f"{obj_name}.obj"
             transformed_path = f'/tmp/{transformed_key}'
-            chamfer_dist = ChamferDistance()
 
             # Download file from OBS
             self.obs_client.getObject(self.bucket_name, object_key, file_path)
@@ -37,15 +30,15 @@ class InferenceHandler(tornado.web.RequestHandler):
             os.remove(file_path)
 
             points = torch.tensor(vertices, dtype=torch.float32).unsqueeze(0)  # Reshape to match model input
-
+            chamfer_dist = ChamferDistance()
             # Model inference
             self.model.eval()
             with torch.no_grad():
                 rot, trans = self.model(points, self.standard_cloud.unsqueeze(0))
                 source_transformed = gu.apply_transform(points, rot, trans)
-                loss = chamfer_dist(source_transformed[:, :, :3], self.standard_cloud.unsqueeze(0)[:, :, :3])
+                loss = gu.compute_loss(chamfer_dist, source_transformed, self.standard_cloud.unsqueeze(0))
                 transformed_points = source_transformed.squeeze().numpy()
-                logger.info(f"chamfer loss is {loss}")
+                gu.logger.info(f"total loss is {loss}")
             #
             # mesh.vertices = transformed_points
             # mesh.export(transformed_path)

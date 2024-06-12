@@ -5,7 +5,12 @@ import numpy as np
 from glob import glob
 import trimesh
 import random
+import logging
+import open3d as o3d
 
+# 配置日志记录
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 class TeethDataset(Dataset):
     def __init__(self, non_standard_path, standard_path, num_points=24000):
@@ -113,6 +118,58 @@ def apply_transform(points, rotation, translation):
     points_transformed = torch.cat((coords_transformed, normals_rotated), dim=2)  # (B, num_points, 6)
 
     return points_transformed
+
+
+def normal_consistency_o3d(normals1, normals2, pc1, pc2, k=10):
+    def compute_normal_consistency(pcd_tree, pcd_source, pcd_target):
+        normal_consistency = []
+        for i in range(len(pcd_source.points)):
+            [_, idx, _] = pcd_tree.search_knn_vector_3d(pcd_source.points[i], k)
+            max_dot = max(np.dot(pcd_target.normals[j], pcd_source.normals[i]) for j in idx)
+            normal_consistency.append(max_dot)
+        return normal_consistency
+
+    batch_size = pc1.shape[0]
+    total_consistency = 0
+
+    for b in range(batch_size):
+        pcd1 = o3d.geometry.PointCloud()
+        pcd1.points = o3d.utility.Vector3dVector(pc1[b])
+        pcd1.normals = o3d.utility.Vector3dVector(normals1[b])
+
+        pcd2 = o3d.geometry.PointCloud()
+        pcd2.points = o3d.utility.Vector3dVector(pc2[b])
+        pcd2.normals = o3d.utility.Vector3dVector(normals2[b])
+
+        pcd_tree1 = o3d.geometry.KDTreeFlann(pcd1)
+        pcd_tree2 = o3d.geometry.KDTreeFlann(pcd2)
+
+        normal_consistency1 = compute_normal_consistency(pcd_tree2, pcd1, pcd2)
+        normal_consistency2 = compute_normal_consistency(pcd_tree1, pcd2, pcd1)
+
+        consistency = 1 - (np.mean(normal_consistency1) + np.mean(normal_consistency2)) / 2
+        total_consistency += consistency
+
+    return total_consistency / batch_size
+
+
+def compute_loss(chamfer_dist, source_transformed, target):
+    # Chamfer distance loss
+    loss_chamfer = chamfer_dist(source_transformed[:, :, :3], target[:, :, :3])
+
+    # Normal consistency loss
+    normal_loss = normal_consistency_o3d(
+        source_transformed[:, :, 3:].detach().cpu().numpy(),
+        target[:, :, 3:].detach().cpu().numpy(),
+        source_transformed[:, :, :3].detach().cpu().numpy(),
+        target[:, :, :3].detach().cpu().numpy()
+    )
+
+    logger.info(f'chamfer loss is {loss_chamfer} and normal loss is {normal_loss}')
+    # Combine losses
+    total_loss = loss_chamfer + normal_loss * source_transformed.size(1)
+
+    return total_loss
 
 
 def quat_to_rotmat(quat):
