@@ -51,7 +51,7 @@ class TeethAlignmentModel(nn.Module):
         return rot, trans
 
 
-def train(model, data_loader, optimizer, epochs=100):
+def train(model, data_loader, optimizer, epochs=50):
     model.train()
     chamfer_dist = ChamferDistance()
     for epoch in range(epochs):

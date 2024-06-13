@@ -171,12 +171,12 @@ def compute_loss(chamfer_dist, source_transformed, target):
 
     # 计算质心之间的欧几里得距离
     centroid_distance = torch.norm(centroid_source - centroid_target, dim=1)
+    centroid_loss = centroid_distance.mean()
 
     logger.info(f'chamfer loss is {loss_chamfer} and normal loss is {normal_loss} '
-                f'and centroid_distance is {centroid_distance}')
+                f'and centroid_loss is {centroid_loss}')
     # Combine losses
-    total_loss = loss_chamfer + normal_loss * 500 + centroid_distance * 10
-
+    total_loss = loss_chamfer + normal_loss * 500 + centroid_loss * 300
     return total_loss
 
 
