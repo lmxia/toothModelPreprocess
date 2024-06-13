@@ -81,6 +81,7 @@ def get_generator_set(non_standard_path, standard_path, batch_size=2, num_points
         ),
         shuffle=True,
         batch_size=batch_size,
+        drop_last=True,
     )
 
     return point_loader
@@ -165,9 +166,16 @@ def compute_loss(chamfer_dist, source_transformed, target):
         target[:, :, :3].detach().cpu().numpy()
     )
 
-    logger.info(f'chamfer loss is {loss_chamfer} and normal loss is {normal_loss}')
+    centroid_source = np.mean(source_transformed[:, :, :3], axis=1)
+    centroid_target = np.mean(target[:, :, :3], axis=1)
+
+    # 计算质心之间的欧几里得距离
+    centroid_distance = np.linalg.norm(centroid_source - centroid_target, axis=1)
+
+    logger.info(f'chamfer loss is {loss_chamfer} and normal loss is {normal_loss} '
+                f'and centroid_distance is {centroid_distance}')
     # Combine losses
-    total_loss = loss_chamfer + normal_loss * source_transformed.size(1)
+    total_loss = loss_chamfer + normal_loss * 500 + centroid_distance * 10
 
     return total_loss
 
