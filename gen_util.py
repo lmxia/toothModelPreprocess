@@ -166,18 +166,59 @@ def compute_loss(chamfer_dist, source_transformed, target):
         target[:, :, :3].detach().cpu().numpy()
     )
 
-    centroid_source = torch.mean(source_transformed[:, :, :3], dim=1)
-    centroid_target = torch.mean(target[:, :, :3], dim=1)
-
-    # 计算质心之间的欧几里得距离
-    centroid_distance = torch.norm(centroid_source - centroid_target, dim=1)
-    centroid_loss = centroid_distance.mean()
+    direction_loss = compute_alignment_loss(
+        source_transformed[:, :, :3].detach().cpu().numpy(),
+        target[:, :, :3].detach().cpu().numpy()
+    )
 
     logger.info(f'chamfer loss is {loss_chamfer} and normal loss is {normal_loss} '
-                f'and centroid_loss is {centroid_loss}')
+                f'and centroid_loss is {direction_loss}')
     # Combine losses
-    total_loss = loss_chamfer + normal_loss * 500 + centroid_loss * 300
+    total_loss = loss_chamfer + normal_loss * 500 + direction_loss * 300
     return total_loss
+
+
+# points [B, N ,3]
+def compute_pca_directions(points):
+    directions = []
+    centroids = []
+    for point_set in points:
+        points_mean = np.mean(point_set, axis=0)
+        centered_points = point_set - points_mean
+        covariance_matrix = np.cov(centered_points, rowvar=False)
+        eigenvalues, eigenvectors = np.linalg.eigh(covariance_matrix)
+        sorted_indices = np.argsort(eigenvalues)[::-1]
+        sorted_eigenvectors = eigenvectors[:, sorted_indices]
+        directions.append(sorted_eigenvectors)
+        centroids.append(points_mean)
+    return np.stack(directions), np.stack(centroids)
+
+
+def slice_point_cloud(points, normal, point_on_plane):
+    d = -np.dot(normal, point_on_plane)
+    distances = np.dot(points, normal) + d
+    threshold = 1e-2
+    on_plane_indices = np.abs(distances) < threshold
+    return points[on_plane_indices]
+
+
+def compute_centroid_direction_vector(points):
+    directions, centroid = compute_pca_directions(points)
+    primary_direction = directions[:, 0]
+    plane_points = slice_point_cloud(points, primary_direction, centroid)
+    plane_centroid = np.mean(plane_points, axis=0)
+    vector_to_plane_centroid = centroid - plane_centroid
+    return vector_to_plane_centroid / np.linalg.norm(vector_to_plane_centroid)
+
+
+def compute_alignment_loss(source_points, target_points):
+    source_vector = compute_centroid_direction_vector(source_points)
+    target_vector = compute_centroid_direction_vector(target_points)
+
+    # Compute the dot product as a measure of alignment
+    dot_product = np.sum(source_vector * target_vector, axis=1)
+    alignment_loss = 1 - np.mean(dot_product)
+    return alignment_loss
 
 
 def quat_to_rotmat(quat):
