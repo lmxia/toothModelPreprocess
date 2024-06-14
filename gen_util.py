@@ -202,13 +202,17 @@ def slice_point_cloud(points, normal, point_on_plane):
     return points[on_plane_indices]
 
 
-def compute_centroid_direction_vector(points):
-    directions, centroid = compute_pca_directions(points)
-    primary_direction = directions[:, 0]
-    plane_points = slice_point_cloud(points, primary_direction, centroid)
-    plane_centroid = np.mean(plane_points, axis=0)
-    vector_to_plane_centroid = centroid - plane_centroid
-    return vector_to_plane_centroid / np.linalg.norm(vector_to_plane_centroid)
+def compute_centroid_direction_vector(points_batch):
+    directions, centroids = compute_pca_directions(points_batch)
+    primary_directions = directions
+    vectors_to_plane_centroid = []
+    for i, points in enumerate(points_batch):
+        plane_points = slice_point_cloud(points, primary_directions[i][:, 0], centroids[i])
+        plane_centroid = np.mean(plane_points, axis=0)
+        vector_to_plane_centroid = plane_centroid - centroids[i]
+        vectors_to_plane_centroid.append(vector_to_plane_centroid / np.linalg.norm(vector_to_plane_centroid))
+
+    return np.stack(vectors_to_plane_centroid)
 
 
 def compute_alignment_loss(source_points, target_points):
