@@ -2,6 +2,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import torch.optim as optim
 import gen_util as gu
 from chamferdist import ChamferDistance
 
@@ -51,7 +52,7 @@ class TeethAlignmentModel(nn.Module):
         return rot, trans
 
 
-def train(model, data_loader, optimizer, epochs=50):
+def train(model, scheduler, data_loader, optimizer, epochs=50):
     model.train()
     chamfer_dist = ChamferDistance()
     for epoch in range(epochs):
@@ -64,7 +65,9 @@ def train(model, data_loader, optimizer, epochs=50):
             loss.backward()
             optimizer.step()
             epoch_loss += loss.item()
-
+        # 调整学习率调度器
+        avg_total_loss = epoch_loss / len(data_loader)
+        scheduler.step(avg_total_loss)
         gu.logger.info(f"Epoch {epoch + 1}, Loss: {epoch_loss / len(data_loader)}")
 
 
@@ -74,10 +77,11 @@ def main():
     train_loader = gu.get_generator_set(non_standard_path, standard_path)
 
     model = TeethAlignmentModel()
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=1e-4)
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min')
 
     # 训练模型
-    train(model, train_loader, optimizer, epochs=100)
+    train(model, scheduler, train_loader, optimizer, epochs=50)
 
     # 保存模型
     model_path = '/data/teeth_alignment_model.pth'

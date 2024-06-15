@@ -29,8 +29,23 @@ class TeethDataset(Dataset):
 
     def __getitem__(self, idx):
         vertices = load_and_sample_mesh(self.mesh_paths[idx], self.num_points)
+
         target = self.standard_cloud
-        return torch.tensor(vertices, dtype=torch.float32), torch.tensor(target, dtype=torch.float32)
+
+        return torch.tensor(augment_point_cloud(vertices), dtype=torch.float32),\
+               torch.tensor(augment_point_cloud(target), dtype=torch.float32)
+
+
+def augment_point_cloud(points):
+    # 随机旋转
+    theta = np.random.uniform(0, 2 * np.pi)
+    rotation_matrix = np.array([
+        [np.cos(theta), -np.sin(theta), 0],
+        [np.sin(theta), np.cos(theta), 0],
+        [0, 0, 1]
+    ])
+    points[:, :3] = np.dot(points[:, :3], rotation_matrix)
+    return points
 
 
 def load_and_sample_mesh(path, num_points=24000):
@@ -172,7 +187,7 @@ def compute_loss(chamfer_dist, source_transformed, target):
     )
 
     logger.info(f'chamfer loss is {loss_chamfer} and normal loss is {normal_loss} '
-                f'and centroid_loss is {direction_loss}')
+                f'and direction_loss is {direction_loss}')
     # Combine losses
     total_loss = loss_chamfer + normal_loss * 500 + direction_loss * 300
     return total_loss
