@@ -5,6 +5,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 import gen_util as gu
 from chamferdist import ChamferDistance
+from math import inf
 
 class TeethAlignmentModel(nn.Module):
     def __init__(self):
@@ -55,6 +56,8 @@ class TeethAlignmentModel(nn.Module):
 def train(model, scheduler, data_loader, optimizer, epochs=50):
     model.train()
     chamfer_dist = ChamferDistance()
+    best_val_loss = inf
+    model_path = '/data/teeth_alignment_model.pth'
     for epoch in range(epochs):
         epoch_loss = 0
         for source, target in data_loader:
@@ -69,6 +72,11 @@ def train(model, scheduler, data_loader, optimizer, epochs=50):
         avg_total_loss = epoch_loss / len(data_loader)
         scheduler.step(avg_total_loss)
         gu.logger.info(f"Epoch {epoch + 1}, Loss: {epoch_loss / len(data_loader)}")
+        if best_val_loss > avg_total_loss:
+            best_val_loss = avg_total_loss
+            # 保存模型
+            torch.save(model.state_dict(), model_path)
+            gu.logger.info(f"Model saved to {model_path}")
 
 
 def main():
@@ -82,11 +90,6 @@ def main():
 
     # 训练模型
     train(model, scheduler, train_loader, optimizer, epochs=50)
-
-    # 保存模型
-    model_path = '/data/teeth_alignment_model.pth'
-    torch.save(model.state_dict(), model_path)
-    gu.logger.info(f"Model saved to {model_path}")
 
 
 if __name__ == '__main__':

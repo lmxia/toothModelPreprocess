@@ -185,11 +185,15 @@ def compute_loss(chamfer_dist, source_transformed, target):
         source_transformed[:, :, :3].detach().cpu().numpy(),
         target[:, :, :3].detach().cpu().numpy()
     )
+    if direction_loss > 1:
+        direction_weight = 1000
+    else:
+        direction_weight = 100
 
     logger.info(f'chamfer loss is {loss_chamfer} and normal loss is {normal_loss} '
                 f'and direction_loss is {direction_loss}')
     # Combine losses
-    total_loss = loss_chamfer + normal_loss * 500 + direction_loss * 300
+    total_loss = loss_chamfer + normal_loss * 500 + direction_loss * direction_weight
     return total_loss
 
 
