@@ -53,7 +53,7 @@ class TeethAlignmentModel(nn.Module):
         return rot, trans
 
 
-def train(model, scheduler, data_loader, optimizer, epochs=50):
+def train(model, data_loader, optimizer, epochs=50):
     model.train()
     chamfer_dist = ChamferDistance()
     best_val_loss = inf
@@ -68,9 +68,7 @@ def train(model, scheduler, data_loader, optimizer, epochs=50):
             loss.backward()
             optimizer.step()
             epoch_loss += loss.item()
-        # 调整学习率调度器
         avg_total_loss = epoch_loss / len(data_loader)
-        scheduler.step(avg_total_loss)
         gu.logger.info(f"Epoch {epoch + 1}, Loss: {epoch_loss / len(data_loader)}")
         if best_val_loss > avg_total_loss:
             best_val_loss = avg_total_loss
@@ -85,11 +83,9 @@ def main():
     train_loader = gu.get_generator_set(non_standard_path, standard_path)
 
     model = TeethAlignmentModel()
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=1e-4)
-    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min')
-
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
     # 训练模型
-    train(model, scheduler, train_loader, optimizer, epochs=50)
+    train(model, train_loader, optimizer, epochs=100)
 
 
 if __name__ == '__main__':
