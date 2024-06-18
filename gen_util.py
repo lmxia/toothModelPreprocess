@@ -33,7 +33,7 @@ class TeethDataset(Dataset):
         target = self.standard_cloud
 
         return torch.tensor(augment_point_cloud(vertices), dtype=torch.float32),\
-               torch.tensor(augment_point_cloud(target), dtype=torch.float32)
+               torch.tensor(target, dtype=torch.float32)
 
 
 def augment_point_cloud(points):
