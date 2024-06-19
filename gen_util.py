@@ -32,7 +32,7 @@ class TeethDataset(Dataset):
 
         target = self.standard_cloud
 
-        return torch.tensor(augment_point_cloud(vertices), dtype=torch.float32),\
+        return torch.tensor(vertices, dtype=torch.float32),\
                torch.tensor(target, dtype=torch.float32)
 
 
@@ -238,6 +238,8 @@ def compute_alignment_loss(source_points, target_points):
     # Compute the dot product as a measure of alignment
     dot_product = np.sum(source_vector * target_vector, axis=1)
     alignment_loss = 1 - np.mean(dot_product)
+    if alignment_loss > 1:
+        alignment_loss = np.exp(alignment_loss)
     return alignment_loss
 
 

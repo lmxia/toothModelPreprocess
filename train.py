@@ -53,7 +53,7 @@ class TeethAlignmentModel(nn.Module):
         return rot, trans
 
 
-def train(model, data_loader, optimizer, epochs=50):
+def train(model, scheduler, data_loader, optimizer, epochs=50):
     model.train()
     chamfer_dist = ChamferDistance()
     best_val_loss = inf
@@ -75,6 +75,7 @@ def train(model, data_loader, optimizer, epochs=50):
             # 保存模型
             torch.save(model.state_dict(), model_path)
             gu.logger.info(f"Model saved to {model_path}")
+        scheduler.step(avg_total_loss)
 
 
 def main():
@@ -84,8 +85,9 @@ def main():
 
     model = TeethAlignmentModel()
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min')
     # 训练模型
-    train(model, train_loader, optimizer, epochs=100)
+    train(model, scheduler, train_loader, optimizer, epochs=50)
 
 
 if __name__ == '__main__':
