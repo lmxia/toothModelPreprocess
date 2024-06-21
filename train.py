@@ -53,18 +53,25 @@ class TeethAlignmentModel(nn.Module):
         return rot, trans
 
 
-def train(model, data_loader, optimizer, epochs=50):
+def train(model, data_loader, optimizer, model_path, standard_path, epochs=50):
     model.train()
     chamfer_dist = ChamferDistance()
     best_val_loss = inf
-    model_path = '/data/teeth_alignment_model.pth'
+
+    target_points = gu.load_and_sample_mesh(standard_path)
+    target_points_batch = np.expand_dims(target_points, axis=0)
+    target_vector = gu.compute_centroid_direction_vector(target_points_batch)[0]
     for epoch in range(epochs):
         epoch_loss = 0
         for source, target in data_loader:
+            # 获取当前批次大小
+            batch_size = source.size(0)
+            # 重复 target_vector
+            repeated_target_vector = np.tile(target_vector, (batch_size, 1))
             optimizer.zero_grad()
             rot, trans = model(source, target)
             source_transformed = gu.apply_transform(source, rot, trans)
-            loss = gu.compute_loss(chamfer_dist, source_transformed, target)
+            loss = gu.compute_loss(chamfer_dist, source_transformed, target, repeated_target_vector)
             loss.backward()
             optimizer.step()
             epoch_loss += loss.item()
@@ -73,20 +80,28 @@ def train(model, data_loader, optimizer, epochs=50):
         if best_val_loss > avg_total_loss:
             best_val_loss = avg_total_loss
             # 保存模型
-            torch.save(model.state_dict(), model_path)
+            gu.save_checkpoint(model, optimizer, epoch, avg_total_loss, filename=model_path)
+            # torch.save(model.state_dict(), model_path)
             gu.logger.info(f"Model saved to {model_path}")
-        # scheduler.step(avg_total_loss)
 
 
 def main():
-    non_standard_path = "/data/tiny_non_standard"
+    non_standard_path = "/data/non_standard"
     standard_path = "/data/xia.stl"
+    model_path = '/data/teeth_alignment_model.pth'
     train_loader = gu.get_generator_set(non_standard_path, standard_path)
-
     model = TeethAlignmentModel()
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+    # 尝试加载上次保存的检查点
+    try:
+        start_epoch, state_dict, optimizer_state_dict, best_loss = gu.load_checkpoint(model_path)
+        model.load_state_dict(state_dict)
+        optimizer.load_state_dict(optimizer_state_dict)
+        print(f"Checkpoint loaded, starting from epoch {start_epoch + 1} with loss {best_loss}")
+    except FileNotFoundError:
+        print("No checkpoint found, starting from scratch.")
     # 训练模型
-    train(model, train_loader, optimizer)
+    train(model, train_loader, optimizer, model_path, standard_path)
 
 
 if __name__ == '__main__':

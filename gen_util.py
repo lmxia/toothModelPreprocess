@@ -169,7 +169,7 @@ def normal_consistency_o3d(normals1, normals2, pc1, pc2, k=10):
     return total_consistency / batch_size
 
 
-def compute_loss(chamfer_dist, source_transformed, target):
+def compute_loss(chamfer_dist, source_transformed, target, target_vector):
     # Chamfer distance loss
     loss_chamfer = chamfer_dist(source_transformed[:, :, :3], target[:, :, :3])
 
@@ -183,7 +183,7 @@ def compute_loss(chamfer_dist, source_transformed, target):
 
     direction_loss = compute_alignment_loss(
         source_transformed[:, :, :3].detach().cpu().numpy(),
-        target[:, :, :3].detach().cpu().numpy()
+        target_vector
     )
     direction_weight = 300
 
@@ -231,10 +231,8 @@ def compute_centroid_direction_vector(points_batch):
     return np.stack(vectors_to_plane_centroid)
 
 
-def compute_alignment_loss(source_points, target_points):
+def compute_alignment_loss(source_points, target_vector):
     source_vector = compute_centroid_direction_vector(source_points)
-    target_vector = compute_centroid_direction_vector(target_points)
-
     # Compute the dot product as a measure of alignment
     dot_product = np.sum(source_vector * target_vector, axis=1)
     alignment_loss = 1 - np.mean(dot_product)
@@ -262,3 +260,18 @@ def quat_to_rotmat(quat):
     rotmat[:, 2, 2] = 1 - 2 * (x ** 2 + y ** 2)
 
     return rotmat
+
+
+def save_checkpoint(model, optimizer, epoch, loss, filename='checkpoint.pth'):
+    state = {
+        'epoch': epoch,
+        'state_dict': model.state_dict(),
+        'optimizer': optimizer.state_dict(),
+        'loss': loss
+    }
+    torch.save(state, filename)
+
+
+def load_checkpoint(filename='checkpoint.pth'):
+    checkpoint = torch.load(filename)
+    return checkpoint['epoch'], checkpoint['state_dict'], checkpoint['optimizer'], checkpoint['loss']
