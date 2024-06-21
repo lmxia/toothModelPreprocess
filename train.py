@@ -60,7 +60,7 @@ def train(model, data_loader, optimizer, model_path, standard_path, epochs=50):
 
     target_points = gu.load_and_sample_mesh(standard_path)
     target_points_batch = np.expand_dims(target_points, axis=0)
-    target_vector = gu.compute_centroid_direction_vector(target_points_batch)[0]
+    target_vector = gu.compute_centroid_direction_vector(target_points_batch[:, :, :3])[0]
     for epoch in range(epochs):
         epoch_loss = 0
         for source, target in data_loader:
