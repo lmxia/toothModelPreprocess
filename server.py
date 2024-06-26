@@ -1,3 +1,4 @@
+import numpy as np
 import tornado.ioloop
 import tornado.web
 import torch
@@ -9,11 +10,12 @@ import gen_util as gu
 from chamferdist import ChamferDistance
 
 class InferenceHandler(tornado.web.RequestHandler):
-    def initialize(self, model, obs_client, bucket_name, standard_cloud):
+    def initialize(self, model, obs_client, bucket_name, standard_cloud, target_vector):
         self.model = model
         self.obs_client = obs_client
         self.bucket_name = bucket_name
         self.standard_cloud = standard_cloud
+        self.target_vector  = target_vector
 
     async def post(self):
         try:
@@ -59,9 +61,10 @@ class InferenceHandler(tornado.web.RequestHandler):
             self.write(json.dumps({"error": str(e)}))
 
 
-def make_app(model, obs_client, bucket_name, standard_cloud):
+def make_app(model, obs_client, bucket_name, standard_cloud, target_vector):
     return tornado.web.Application([
-        (r"/infer", InferenceHandler, dict(model=model, obs_client=obs_client, bucket_name=bucket_name, standard_cloud=standard_cloud)),
+        (r"/infer", InferenceHandler, dict(model=model, obs_client=obs_client, bucket_name=bucket_name,
+                                           standard_cloud=standard_cloud, target_vector=target_vector)),
     ])
 
 
@@ -89,6 +92,9 @@ if __name__ == "__main__":
     vertices = gu.load_and_sample_mesh(args.standard_model_path)
     standard_cloud = torch.tensor(vertices, dtype=torch.float32)
 
+    target_points_batch = np.expand_dims(vertices, axis=0)
+    target_vector = gu.compute_centroid_direction_vector(target_points_batch[:, :, :3])[0]
+    target_vector = np.tile(target_vector, (1, 1))
     # Initialize OBS client
     obs_client = ObsClient(
         access_key_id=args.obs_access_key,
@@ -96,7 +102,7 @@ if __name__ == "__main__":
         server=args.obs_endpoint
     )
 
-    app = make_app(model, obs_client, args.bucket_name, standard_cloud)
+    app = make_app(model, obs_client, args.bucket_name, standard_cloud, target_vector)
     app.listen(args.port)
     print(f"Server running on port {args.port}")
     tornado.ioloop.IOLoop.current().start()
