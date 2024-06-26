@@ -80,7 +80,9 @@ if __name__ == "__main__":
 
     # Load the model
     model = TeethAlignmentModel()
-    model.load_state_dict(torch.load(args.model_path))
+
+    _, state_dict, _, _ = gu.load_checkpoint(args.model_path)
+    model.load_state_dict(state_dict)
     model.eval()
 
     # Load standard model point cloud
