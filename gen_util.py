@@ -13,10 +13,13 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 class TeethDataset(Dataset):
-    def __init__(self, non_standard_path, standard_path, num_points=24000):
+    def __init__(self, non_standard_path, standard_path, model_type, num_points=24000):
         stl_path_ls = []
         for dir_path in [x[0] for x in os.walk(non_standard_path)][1:]:
-            stl_path_ls += glob(os.path.join(dir_path, "*Lower-PreparationScan_transformed.stl"))
+            if model_type == "lower":
+                stl_path_ls += glob(os.path.join(dir_path, "*Lower-PreparationScan_transformed.stl"))
+            else:
+                stl_path_ls += glob(os.path.join(dir_path, "*Upper-AntagonistScan_transformed.stl"))
 
         self.mesh_paths = stl_path_ls
         self.standard_path = standard_path
@@ -87,11 +90,12 @@ def upsample(points, num_points):
     return points[indices]
 
 
-def get_generator_set(non_standard_path, standard_path, batch_size=2, num_points=24000):
+def get_generator_set(non_standard_path, standard_path, model_type, batch_size=2, num_points=24000):
     point_loader = DataLoader(
         TeethDataset(
             non_standard_path,
             standard_path,
+            model_type,
             num_points=num_points
         ),
         shuffle=True,

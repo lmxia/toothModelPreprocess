@@ -86,10 +86,18 @@ def train(model, data_loader, optimizer, model_path, standard_path, epochs=50):
 
 
 def main():
+    import argparse
+    parser = argparse.ArgumentParser(description='Teeth alignment train entrypoint')
+    parser.add_argument('--target', type=str, default="upper", help='upper or lower')
+    args = parser.parse_args()
+    if args.target == "upper":
+        standard_path = "/data/shang.stl"
+        model_path = '/data/teeth_alignment_upper_model.pth'
+    else:
+        standard_path = "/data/xia.stl"
+        model_path = '/data/teeth_alignment_lower_model.pth'
     non_standard_path = "/data/non_standard"
-    standard_path = "/data/xia.stl"
-    model_path = '/data/teeth_alignment_model.pth'
-    train_loader = gu.get_generator_set(non_standard_path, standard_path)
+    train_loader = gu.get_generator_set(non_standard_path, standard_path, args.target)
     model = TeethAlignmentModel()
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
     # 尝试加载上次保存的检查点
