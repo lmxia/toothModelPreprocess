@@ -38,7 +38,7 @@ class InferenceHandler(tornado.web.RequestHandler):
             with torch.no_grad():
                 rot, trans = self.model(points, self.standard_cloud.unsqueeze(0))
                 source_transformed = gu.apply_transform(points, rot, trans)
-                loss = gu.compute_loss(chamfer_dist, source_transformed, self.standard_cloud.unsqueeze(0))
+                loss = gu.compute_loss(chamfer_dist, source_transformed, self.standard_cloud.unsqueeze(0), self.target_vector)
                 transformed_points = source_transformed.squeeze().numpy()
                 gu.logger.info(f"total loss is {loss}")
             #
