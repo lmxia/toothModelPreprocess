@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-import gen_util as gu
+from utils import gen_util as gu
 from chamferdist import ChamferDistance
 from math import inf
 

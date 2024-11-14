@@ -6,7 +6,7 @@ import os
 from obs import ObsClient
 import json
 from train import TeethAlignmentModel
-import gen_util as gu
+from utils import gen_util as gu
 from chamferdist import ChamferDistance
 
 class InferenceHandler(tornado.web.RequestHandler):
