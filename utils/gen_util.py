@@ -4,7 +4,7 @@ import os
 import numpy as np
 from glob import glob
 import trimesh
-import random
+import torch.nn.functional as F
 import logging
 import open3d as o3d
 
@@ -13,13 +13,11 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 class TeethDataset(Dataset):
-    def __init__(self, non_standard_path, standard_path, model_type, num_points=24000):
+    def __init__(self, non_standard_path, standard_path, num_points=24000):
         stl_path_ls = []
         for dir_path in [x[0] for x in os.walk(non_standard_path)][1:]:
-            if model_type == "lower":
-                stl_path_ls += glob(os.path.join(dir_path, "*Lower-PreparationScan_transformed.stl"))
-            else:
-                stl_path_ls += glob(os.path.join(dir_path, "*Upper-AntagonistScan_transformed.stl"))
+            stl_path_ls += glob(os.path.join(dir_path, "*Lower.stl"))
+            stl_path_ls += glob(os.path.join(dir_path, "*Upper.stl"))
 
         self.mesh_paths = stl_path_ls
         self.standard_path = standard_path
@@ -90,12 +88,11 @@ def upsample(points, num_points):
     return points[indices]
 
 
-def get_generator_set(non_standard_path, standard_path, model_type, batch_size=2, num_points=24000):
+def get_generator_set(non_standard_path, standard_path, batch_size=4, num_points=12000):
     point_loader = DataLoader(
         TeethDataset(
             non_standard_path,
             standard_path,
-            model_type,
             num_points=num_points
         ),
         shuffle=True,
@@ -173,7 +170,7 @@ def normal_consistency_o3d(normals1, normals2, pc1, pc2, k=10):
     return total_consistency / batch_size
 
 
-def compute_loss(chamfer_dist, source_transformed, target, target_vector):
+def compute_loss(chamfer_dist, source_transformed, target, target_vector, source_features, target_features):
     # Chamfer distance loss
     loss_chamfer = chamfer_dist(source_transformed[:, :, :3], target[:, :, :3])
 
@@ -185,16 +182,18 @@ def compute_loss(chamfer_dist, source_transformed, target, target_vector):
         target[:, :, :3].detach().cpu().numpy()
     )
 
-    direction_loss = compute_alignment_loss(
-        source_transformed[:, :, :3].detach().cpu().numpy(),
-        target_vector
-    )
-    direction_weight = 500
+    # direction_loss = compute_alignment_loss(
+    #     source_transformed[:, :, :3].detach().cpu().numpy(),
+    #     target_vector
+    # )
+    # direction_weight = 0
+    # Feature alignment loss (L2 distance between source and target features)
+    feature_alignment_loss = F.mse_loss(source_features, target_features)
 
     logger.info(f'chamfer loss is {loss_chamfer} and normal loss is {normal_loss} '
-                f'and direction_loss is {direction_loss}')
+                f' feature_alignment_loss is {feature_alignment_loss}')
     # Combine losses
-    total_loss = loss_chamfer + normal_loss * 500 + direction_loss * direction_weight
+    total_loss = loss_chamfer + normal_loss * 500 + feature_alignment_loss * 300
     return total_loss
 
 

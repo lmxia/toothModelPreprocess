@@ -50,7 +50,7 @@ class TeethAlignmentModel(nn.Module):
         rot = self.fc_rot(x)
         trans = self.fc_trans(x)
 
-        return rot, trans
+        return rot, trans, source_features, target_features
 
 
 def train(model, data_loader, optimizer, model_path, standard_path, epochs=50):
@@ -69,9 +69,10 @@ def train(model, data_loader, optimizer, model_path, standard_path, epochs=50):
             # 重复 target_vector
             repeated_target_vector = np.tile(target_vector, (batch_size, 1))
             optimizer.zero_grad()
-            rot, trans = model(source, target)
+            rot, trans, source_features, target_features = model(source, target)
             source_transformed = gu.apply_transform(source, rot, trans)
-            loss = gu.compute_loss(chamfer_dist, source_transformed, target, repeated_target_vector)
+            loss = gu.compute_loss(chamfer_dist, source_transformed, target,
+                                   repeated_target_vector, source_features, target_features)
             loss.backward()
             optimizer.step()
             epoch_loss += loss.item()
@@ -86,18 +87,10 @@ def train(model, data_loader, optimizer, model_path, standard_path, epochs=50):
 
 
 def main():
-    import argparse
-    parser = argparse.ArgumentParser(description='Teeth alignment train entrypoint')
-    parser.add_argument('--target', type=str, default="upper", help='upper or lower')
-    args = parser.parse_args()
-    if args.target == "upper":
-        standard_path = "/data/shang.stl"
-        model_path = '/data/teeth_alignment_upper_model.pth'
-    else:
-        standard_path = "/data/xia.stl"
-        model_path = '/data/teeth_alignment_lower_model.pth'
-    non_standard_path = "/data/non_standard"
-    train_loader = gu.get_generator_set(non_standard_path, standard_path, args.target)
+    standard_path = "/data/shang.stl"
+    model_path = '/data/teeth_alignment_upper_model.pth'
+    non_standard_path = "/data/teeth"
+    train_loader = gu.get_generator_set(non_standard_path, standard_path)
     model = TeethAlignmentModel()
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
     # 尝试加载上次保存的检查点

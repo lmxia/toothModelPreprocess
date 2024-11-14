@@ -71,6 +71,8 @@ def train(model, train_loader, val_loader, criterion, optimizer, model_path, epo
         # 验证模式
         model.eval()
         val_loss = 0.0
+        correct = 0
+        total = 0
         with torch.no_grad():  # 不计算梯度
             for data in val_loader:
                 source, labels = data  # 获取一个batch的验证数据
@@ -78,11 +80,14 @@ def train(model, train_loader, val_loader, criterion, optimizer, model_path, epo
                 output = model(pointclouds)  # 进行前向传播
                 loss = criterion(output, labels)  # 计算损失
                 val_loss += loss.item()  # 累加验证损失
+                _, predicted = torch.max(output, 1)
+                correct += (predicted == labels).sum().item()
+                total += labels.size(0)
 
         # 计算验证集平均损失
         avg_val_loss = val_loss / len(val_loader)
         print(f"Epoch {epoch + 1}/{epochs}, Validation Loss: {avg_val_loss:.4f}")
-
+        logger.info(f"val predict right {correct}/{total}")
         # 如果当前验证损失小于之前的最小损失，保存当前模型
         if avg_val_loss < best_val_loss:
             best_val_loss = avg_val_loss
@@ -99,7 +104,7 @@ if __name__ == '__main__':
     train_loader = DataLoader(dataset, batch_size=8, shuffle=True)
 
     val_dataset = UShapeDataset("/data/val_teeth")
-    val_loader = DataLoader(val_dataset, batch_size=8, shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=2, shuffle=True)
     # 模型实例化
     model = PointNetClassifier()
     criterion = nn.CrossEntropyLoss()  # 二分类交叉熵损失
