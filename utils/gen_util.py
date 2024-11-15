@@ -182,18 +182,18 @@ def compute_loss(chamfer_dist, source_transformed, target, target_vector, source
         target[:, :, :3].detach().cpu().numpy()
     )
 
-    # direction_loss = compute_alignment_loss(
-    #     source_transformed[:, :, :3].detach().cpu().numpy(),
-    #     target_vector
-    # )
-    # direction_weight = 0
+    direction_loss = compute_alignment_loss(
+        source_transformed[:, :, :3].detach().cpu().numpy(),
+        target_vector
+    )
+    direction_weight = 200
     # Feature alignment loss (L2 distance between source and target features)
     feature_alignment_loss = F.mse_loss(source_features, target_features)
 
     logger.info(f'chamfer loss is {loss_chamfer} and normal loss is {normal_loss} '
-                f' feature_alignment_loss is {feature_alignment_loss}')
+                f' direction_loss is {direction_loss} feature_alignment_loss is {feature_alignment_loss}')
     # Combine losses
-    total_loss = loss_chamfer + normal_loss * 500 + feature_alignment_loss * 300
+    total_loss = loss_chamfer + normal_loss * 500 + direction_loss * direction_weight + feature_alignment_loss * 300
     return total_loss
 
 
@@ -278,3 +278,24 @@ def save_checkpoint(model, optimizer, epoch, loss, filename='checkpoint.pth'):
 def load_checkpoint(filename='checkpoint.pth'):
     checkpoint = torch.load(filename)
     return checkpoint['epoch'], checkpoint['state_dict'], checkpoint['optimizer'], checkpoint['loss']
+
+
+def save_mesh(file_path, points):
+    """
+    保存点云到 .ply 文件，只保存点云数据 (N, 3) 格式
+
+    :param file_path: 保存的文件路径
+    :param points: 点云数据，应该是一个 (N, 3) 的 numpy 数组
+    """
+    # 确保输入的 points 是 numpy 数组并且形状为 (N, 3)
+    points = np.asarray(points)
+    if points.shape[1] < 3:
+        raise ValueError("Points should have shape (N, 3).")
+
+    # 使用 trimesh 创建一个点云对象
+    cloud = trimesh.points.PointCloud(points[:, :3])
+
+    # 将点云保存为 ply 文件
+    cloud.export(file_path)
+
+    print(f"Mesh saved to {file_path}")
